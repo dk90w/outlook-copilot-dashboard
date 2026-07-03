@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Outlook Copilot - External Task Manager</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --primary: #0078d4;
+            --success: #107c10;
+            --warning: #ffb900;
+            --danger: #d13438;
+            --gray-light: #f3f2f1;
+            --gray-border: #d2d0ce;
+            --text: #323130;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fafafa;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-bottom: 4px solid var(--primary);
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            color: var(--primary);
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+            border-bottom: 2px solid var(--gray-border);
+        }
+
+        .tab-btn {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            color: #666;
+            transition: all 0.3s;
+        }
+
+        .tab-btn.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid var(--gray-border);
+        }
+
+        .task-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 15px;
+            border-left: 4px solid var(--primary);
+            margin-bottom: 15px;
+        }
+
+        .task-card.high-priority {
+            border-left-color: var(--danger);
+        }
+
+        .task-card.medium-priority {
+            border-left-color: var(--warning);
+        }
+
+        .task-info h3 {
+            font-size: 16px;
+            margin-bottom: 5px;
+        }
+
+        .task-details {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 3px 0;
+        }
+
+        .status-pending {
+            background: #fff4ce;
+            color: #886c00;
+        }
+
+        .status-in-progress {
+            background: #c7e0f4;
+            color: #004578;
+        }
+
+        .status-completed {
+            background: #dffcf0;
+            color: #0b6a0b;
+        }
+
+        .task-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #106ebe;
+        }
+
+        .btn-secondary {
+            background: var(--gray-light);
+            color: var(--text);
+            border: 1px solid var(--gray-border);
+        }
+
+        .btn-secondary:hover {
+            background: #ebe9e7;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #0c5c0f;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid var(--gray-border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: inherit;
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--gray-border);
+        }
+
+        .stat-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+            opacity: 0.5;
+        }
+
+        .timeline {
+            position: relative;
+            padding-left: 30px;
+        }
+
+        .timeline-item {
+            padding-bottom: 20px;
+            border-left: 2px solid var(--gray-border);
+            padding-left: 20px;
+            margin-left: -30px;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -6px;
+            width: 10px;
+            height: 10px;
+            background: var(--primary);
+            border-radius: 50%;
+            top: 5px;
+        }
+
+        .timeline-time {
+            font-size: 12px;
+            color: #999;
+            margin-bottom: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📧 Outlook Copilot</h1>
+            <p class="subtitle">Intelligent external task reminder and management system</p>
+        </header>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="tasks">External Tasks</button>
+            <button class="tab-btn" data-tab="add-task">Add Task</button>
+            <button class="tab-btn" data-tab="history">Reminder History</button>
+            <button class="tab-btn" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- DASHBOARD TAB -->
+        <div id="dashboard" class="tab-content active">
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-number" id="stat-total">0</div>
+                    <div class="stat-label">Total Tasks</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="stat-pending">0</div>
+                    <div class="stat-label">Pending</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="stat-due-soon">0</div>
+                    <div class="stat-label">Due Soon</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-number" id="stat-reminders-sent">0</div>
+                    <div class="stat-label">Reminders Sent</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>🎯 Next Reminders (This Week)</h2>
+                <div id="next-reminders" style="margin-top: 15px;">
+                    <div class="empty-state">
+                        <p>No upcoming reminders this week</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>⚠️ High Priority Tasks</h2>
+                <div id="high-priority" style="margin-top: 15px;">
+                    <div class="empty-state">
+                        <p>No high-priority tasks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TASKS TAB -->
+        <div id="tasks" class="tab-content">
+            <div class="card">
+                <h2>External Tasks</h2>
+                <div id="tasks-list" style="margin-top: 15px;">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📭</div>
+                        <p>No tasks yet. Create one to get started!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ADD TASK TAB -->
+        <div id="add-task" class="tab-content">
+            <div class="card">
+                <h2>Create External Task</h2>
+                <form id="task-form" style="margin-top: 15px;">
+                    <div class="form-group">
+                        <label>Task Title *</label>
+                        <input type="text" id="task-title" placeholder="e.g., Follow up with Client ABC" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>External Contact Name *</label>
+                            <input type="text" id="task-contact-name" placeholder="John Doe" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Contact Email *</label>
+                            <input type="email" id="task-contact-email" placeholder="john@example.com" required>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Deadline *</label>
+                            <input type="date" id="task-deadline" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Priority</label>
+                            <select id="task-priority">
+                                <option value="low">Low</option>
+                                <option value="medium" selected>Medium</option>
+                                <option value="high">High</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="task-description" placeholder="Add details about this task..."></textarea>
+                    </div>
+
+                    <div class="form-row">
+                        <button type="submit" class="btn-primary" style="width: 100%;">Create Task</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- HISTORY TAB -->
+        <div id="history" class="tab-content">
+            <div class="card">
+                <h2>Reminder History</h2>
+                <div id="reminder-history" style="margin-top: 15px;">
+                    <div class="empty-state">
+                        <p>No reminders sent yet</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETTINGS TAB -->
+        <div id="settings" class="tab-content">
+            <div class="card">
+                <h2>Reminder Preferences</h2>
+                <form id="settings-form" style="margin-top: 15px;">
+                    <h3 style="margin: 15px 0 10px 0; font-size: 14px;">Notification Channels</h3>
+                    <div class="form-group">
+                        <input type="checkbox" id="channel-email" checked> <label for="channel-email" style="display: inline;">Email Notifications</label>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="channel-calendar" checked> <label for="channel-calendar" style="display: inline;">Outlook Calendar Events</label>
+                    </div>
+                    <div class="form-group">
+                        <input type="checkbox" id="channel-notification" checked> <label for="channel-notification" style="display: inline;">Desktop Notifications</label>
+                    </div>
+
+                    <h3 style="margin: 20px 0 10px 0; font-size: 14px;">Reminder Triggers</h3>
+                    <div class="form-group">
+                        <label>Days Before Deadline to Remind</label>
+                        <input type="number" id="deadline-days" value="3" min="1" max="30">
+                    </div>
+                    <div class="form-group">
+                        <label>Inactivity Alert (days)</label>
+                        <input type="number" id="inactivity-days" value="7" min="1" max="30">
+                    </div>
+                    <div class="form-group">
+                        <label>Recurring Reminder Days</label>
+                        <input type="text" id="reminder-days" value="1, 7, 14" placeholder="Comma-separated days">
+                    </div>
+
+                    <button type="submit" class="btn-success" style="margin-top: 20px;">Save Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Data management
+        const storageKey = 'outlook-copilot-tasks';
+
+        function loadTasks() {
+            const data = localStorage.getItem(storageKey);
+            return data ? JSON.parse(data) : [];
+        }
+
+        function saveTasks(tasks) {
+            localStorage.setItem(storageKey, JSON.stringify(tasks));
+            renderAll();
+        }
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                this.classList.add('active');
+                document.getElementById(this.dataset.tab).classList.add('active');
+            });
+        });
+
+        // Task form submission
+        document.getElementById('task-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const tasks = loadTasks();
+            const newTask = {
+                id: 'task_' + Date.now(),
+                title: document.getElementById('task-title').value,
+                externalContact: document.getElementById('task-contact-email').value,
+                contactName: document.getElementById('task-contact-name').value,
+                description: document.getElementById('task-description').value,
+                deadline: document.getElementById('task-deadline').value,
+                priority: document.getElementById('task-priority').value,
+                status: 'pending',
+                createdDate: new Date().toISOString().split('T')[0],
+                lastActivity: new Date().toISOString().split('T')[0],
+                remindersSent: 0,
+                notes: ''
+            };
+            tasks.push(newTask);
+            saveTasks(tasks);
+            this.reset();
+            document.querySelector('[data-tab="tasks"]').click();
+            alert('✅ Task created! The copilot will now monitor this for you.');
+        });
+
+        // Settings form
+        document.getElementById('settings-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const settings = {
+                channels: {
+                    email: document.getElementById('channel-email').checked,
+                    calendar: document.getElementById('channel-calendar').checked,
+                    notification: document.getElementById('channel-notification').checked
+                },
+                triggers: {
+                    deadlineReminder: parseInt(document.getElementById('deadline-days').value),
+                    inactivityDays: parseInt(document.getElementById('inactivity-days').value),
+                    timeBasedDays: document.getElementById('reminder-days').value.split(',').map(d => parseInt(d.trim()))
+                }
+            };
+            localStorage.setItem('copilot-settings', JSON.stringify(settings));
+            alert('✅ Settings saved!');
+        });
+
+        // Render functions
+        function renderDashboard() {
+            const tasks = loadTasks();
+            const total = tasks.length;
+            const pending = tasks.filter(t => t.status === 'pending').length;
+            const dueSoon = tasks.filter(t => {
+                const days = (new Date(t.deadline) - new Date()) / (1000 * 60 * 60 * 24);
+                return days <= 7 && days > 0;
+            }).length;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-pending').textContent = pending;
+            document.getElementById('stat-due-soon').textContent = dueSoon;
+
+            const remLog = localStorage.getItem('reminder-log');
+            document.getElementById('stat-reminders-sent').textContent = remLog ? JSON.parse(remLog).length : 0;
+
+            // Next reminders
+            const nextReminders = tasks
+                .filter(t => t.status === 'pending')
+                .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+                .slice(0, 3);
+
+            const nextContainer = document.getElementById('next-reminders');
+            if (nextReminders.length === 0) {
+                nextContainer.innerHTML = '<div class="empty-state"><p>No upcoming reminders</p></div>';
+            } else {
+                nextContainer.innerHTML = nextReminders.map(t => {
+                    const daysUntil = Math.ceil((new Date(t.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+                    return `
+                        <div class="task-card ${t.priority}-priority">
+                            <div class="task-info">
+                                <h3>${t.title}</h3>
+                                <div class="task-details">
+                                    📧 ${t.contactName} (${t.externalContact})<br>
+                                    📅 Due in ${daysUntil} days (${t.deadline})
+                                </div>
+                            </div>
+                            <button class="btn-primary btn-small" onclick="triggerReminder('${t.id}')">Send Now</button>
+                        </div>
+                    `;
+                }).join('');
+            }
+
+            // High priority
+            const highPriority = tasks.filter(t => t.priority === 'high' && t.status === 'pending');
+            const highContainer = document.getElementById('high-priority');
+            if (highPriority.length === 0) {
+                highContainer.innerHTML = '<div class="empty-state"><p>No high-priority tasks</p></div>';
+            } else {
+                highContainer.innerHTML = highPriority.map(t => `
+                    <div class="task-card high-priority">
+                        <div class="task-info">
+                            <h3>🔴 ${t.title}</h3>
+                            <div class="task-details">${t.description}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function renderTasks() {
+            const tasks = loadTasks();
+            const container = document.getElementById('tasks-list');
+
+            if (tasks.length === 0) {
+                container.innerHTML = '<div class="empty-state"><div class="empty-state-icon">📭</div><p>No tasks yet. Create one to get started!</p></div>';
+                return;
+            }
+
+            container.innerHTML = tasks.map(t => {
+                const daysUntil = Math.ceil((new Date(t.deadline) - new Date()) / (1000 * 60 * 60 * 24));
+                return `
+                    <div class="task-card ${t.priority}-priority">
+                        <div class="task-info">
+                            <h3>${t.title}</h3>
+                            <span class="status-badge status-${t.status}">${t.status.toUpperCase()}</span>
+                            <div class="task-details" style="margin-top: 8px;">
+                                <strong>Contact:</strong> ${t.contactName} (${t.externalContact})<br>
+                                <strong>Deadline:</strong> ${t.deadline} (${daysUntil} days)<br>
+                                <strong>Description:</strong> ${t.description || 'No description'}<br>
+                                <strong>Reminders Sent:</strong> ${t.remindersSent}
+                            </div>
+                        </div>
+                        <div class="task-actions">
+                            <button class="btn-primary btn-small" onclick="triggerReminder('${t.id}')">Remind</button>
+                            <button class="btn-secondary btn-small" onclick="updateTaskStatus('${t.id}', 'completed')">Complete</button>
+                            <button class="btn-secondary btn-small" onclick="deleteTask('${t.id}')">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderHistory() {
+            const remLog = localStorage.getItem('reminder-log');
+            const history = remLog ? JSON.parse(remLog) : [];
+            const container = document.getElementById('reminder-history');
+
+            if (history.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>No reminders sent yet</p></div>';
+                return;
+            }
+
+            const tasks = loadTasks();
+            container.innerHTML = '<div class="timeline">' + history.slice().reverse().map(h => {
+                const task = tasks.find(t => t.id === h.taskId);
+                return `
+                    <div class="timeline-item">
+                        <div class="timeline-time">${new Date(h.sentAt).toLocaleString()}</div>
+                        <strong>${task ? task.title : 'Unknown Task'}</strong><br>
+                        <small>via ${h.channel.toUpperCase()} • ${h.triggerType}</small>
+                    </div>
+                `;
+            }).join('') + '</div>';
+        }
+
+        function renderAll() {
+            renderDashboard();
+            renderTasks();
+            renderHistory();
+        }
+
+        // Actions
+        function triggerReminder(taskId) {
+            const tasks = loadTasks();
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return;
+
+            const history = JSON.parse(localStorage.getItem('reminder-log') || '[]');
+            history.push({
+                taskId: taskId,
+                sentAt: new Date().toISOString(),
+                channel: 'email',
+                triggerType: 'manual'
+            });
+            localStorage.setItem('reminder-log', JSON.stringify(history));
+
+            task.remindersSent = (task.remindersSent || 0) + 1;
+            task.lastActivity = new Date().toISOString().split('T')[0];
+            saveTasks(tasks);
+
+            alert(`✅ Reminder sent to ${task.contactName}!\n\nIn production, this would:\n📧 Send email\n📅 Create Outlook calendar event\n🔔 Show notification`);
+        }
+
+        function updateTaskStatus(taskId, status) {
+            const tasks = loadTasks();
+            const task = tasks.find(t => t.id === taskId);
+            if (task) {
+                task.status = status;
+                saveTasks(tasks);
+            }
+        }
+
+        function deleteTask(taskId) {
+            if (confirm('Delete this task?')) {
+                const tasks = loadTasks().filter(t => t.id !== taskId);
+                saveTasks(tasks);
+            }
+        }
+
+        // Load settings
+        const savedSettings = localStorage.getItem('copilot-settings');
+        if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            document.getElementById('channel-email').checked = settings.channels.email;
+            document.getElementById('channel-calendar').checked = settings.channels.calendar;
+            document.getElementById('channel-notification').checked = settings.channels.notification;
+            document.getElementById('deadline-days').value = settings.triggers.deadlineReminder;
+            document.getElementById('inactivity-days').value = settings.triggers.inactivityDays;
+            document.getElementById('reminder-days').value = settings.triggers.timeBasedDays.join(', ');
+        }
+
+        // Initial render
+        renderAll();
+    </script>
+</body>
+</html>
